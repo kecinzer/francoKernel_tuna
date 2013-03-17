@@ -39,7 +39,7 @@
 #include <linux/uaccess.h>
 
 /* contrast tweak from morfic - Trinity Kernel */
-static int contrast = -5;
+static int contrast = -4;
 module_param(contrast, int, 0755);
 
 #ifdef CONFIG_COLOR_CONTROL
@@ -80,7 +80,7 @@ static int s6e8aa0_update(struct omap_dss_device *dssdev,
 static struct omap_video_timings s6e8aa0_timings = {
 	.x_res = 720,
 	.y_res = 1280,
-	.pixel_clock = 79494,
+	.pixel_clock = 80842,
 	.hfp = 158,
 	.hsw = 2,
 	.hbp = 160,
@@ -199,7 +199,7 @@ struct omap_dss_device * lcd_dev;
 
 struct s6e8aa0_data * s6_data;
 
-int v1_offset[3] = {-4, 0, 5};
+int v1_offset[3] = {-4, 0, 4};
 #endif
 
 static int s6e8aa0_write_reg(struct omap_dss_device *dssdev, u8 reg, u8 val)
