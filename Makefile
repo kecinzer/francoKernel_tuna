@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 0
 SUBLEVEL = 69
-EXTRAVERSION =
-NAME = Sneaky Weasel
+EXTRAVERSION = +
+NAME = kecinzer edition
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
