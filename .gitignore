@@ -89,3 +89,5 @@ cloudcar.sh
 cloudcar_config
 drivers/net/wireless/bcmdhd_bk/
 tuna_config_fk
+build.sh
+flash.sh
