@@ -1146,7 +1146,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			__cpufreq_driver_target(policy,
 					policy->min, CPUFREQ_RELATION_L);
 		for_each_cpu(j, policy->cpus) {
-			unsigned long exp;
+			unsigned long uninitialized_var(exp);
 
 			pcpu = &per_cpu(cpuinfo, j);
 
@@ -1172,7 +1172,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			if (timer_slack_val >= 0 &&
 			    !timer_pending(&pcpu->cpu_slack_timer)) {
 				exp += usecs_to_jiffies(timer_slack_val);
-				pcpu->cpu_slack_timer.expires = expires;
+				pcpu->cpu_slack_timer.expires = exp;
 				add_timer_on(&pcpu->cpu_slack_timer, j);
 			}
 			up_write(&pcpu->enable_sem);
