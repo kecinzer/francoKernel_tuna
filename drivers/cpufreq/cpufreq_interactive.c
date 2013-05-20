@@ -354,6 +354,9 @@ static void cpufreq_interactive_timer(unsigned long data)
 	if (!pcpu->governor_enabled)
 		goto exit;
 
+	if (cpu_is_offline(data))
+		goto exit;
+
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	now = update_load(data);
 	delta_time = (unsigned int)(now - pcpu->cputime_speedadj_timestamp);
@@ -461,15 +464,20 @@ exit:
 
 static void cpufreq_interactive_idle_start(void)
 {
-	struct cpufreq_interactive_cpuinfo *pcpu =
-		&per_cpu(cpuinfo, smp_processor_id());
+	int cpu = smp_processor_id();
+	struct cpufreq_interactive_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
 	int pending;
 
 	if (!down_read_trylock(&pcpu->enable_sem))
 		return;
-	if (!pcpu->governor_enabled) {
-		up_read(&pcpu->enable_sem);
-		return;
+	if (!pcpu->governor_enabled)
+		goto exit;
+
+	/* Cancel the timer if cpu is offline */
+	if (cpu_is_offline(cpu)) {
+		del_timer(&pcpu->cpu_timer);
+		del_timer(&pcpu->cpu_slack_timer);
+		goto exit;
 	}
 
 	pending = timer_pending(&pcpu->cpu_timer);
@@ -487,6 +495,7 @@ static void cpufreq_interactive_idle_start(void)
 			cpufreq_interactive_timer_resched(pcpu);
 	}
 
+exit:
 	up_read(&pcpu->enable_sem);
 }
 
@@ -631,9 +640,19 @@ static int cpufreq_interactive_notifier(
 		for_each_cpu(cpu, pcpu->policy->cpus) {
 			struct cpufreq_interactive_cpuinfo *pjcpu =
 				&per_cpu(cpuinfo, cpu);
+			if (cpu != freq->cpu) {
+				if (!down_read_trylock(&pjcpu->enable_sem))
+					continue;
+				if (!pjcpu->governor_enabled) {
+					up_read(&pjcpu->enable_sem);
+					continue;
+				}
+			}
 			spin_lock_irqsave(&pjcpu->load_lock, flags);
 			update_load(cpu);
 			spin_unlock_irqrestore(&pjcpu->load_lock, flags);
+			if (cpu != freq->cpu)
+				up_read(&pjcpu->enable_sem);
 		}
 
 		up_read(&pcpu->enable_sem);
@@ -1059,11 +1078,13 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			down_write(&pcpu->enable_sem);
 			expires = jiffies + usecs_to_jiffies(timer_rate);
 			pcpu->cpu_timer.expires = expires;
-			add_timer_on(&pcpu->cpu_timer, j);
-			if (timer_slack_val >= 0) {
-				expires += usecs_to_jiffies(timer_slack_val);
-				pcpu->cpu_slack_timer.expires = expires;
-				add_timer_on(&pcpu->cpu_slack_timer, j);
+			if (cpu_online(j)) {
+				add_timer_on(&pcpu->cpu_timer, j);
+				if (timer_slack_val >= 0) {
+					expires += usecs_to_jiffies(timer_slack_val);
+					pcpu->cpu_slack_timer.expires = expires;
+					add_timer_on(&pcpu->cpu_slack_timer, j);
+				}
 			}
 			pcpu->governor_enabled = 1;
 			up_write(&pcpu->enable_sem);
@@ -1117,12 +1138,46 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		break;
 
 	case CPUFREQ_GOV_LIMITS:
+		mutex_lock(&gov_lock);
 		if (policy->max < policy->cur)
 			__cpufreq_driver_target(policy,
 					policy->max, CPUFREQ_RELATION_H);
 		else if (policy->min > policy->cur)
 			__cpufreq_driver_target(policy,
 					policy->min, CPUFREQ_RELATION_L);
+		for_each_cpu(j, policy->cpus) {
+			unsigned long uninitialized_var(exp);
+
+			pcpu = &per_cpu(cpuinfo, j);
+
+			/* hold write semaphore to avoid race */
+			down_write(&pcpu->enable_sem);
+			if (pcpu->governor_enabled == 0) {
+				up_write(&pcpu->enable_sem);
+				continue;
+			}
+
+			/* update target_freq firstly */
+			if (policy->max < pcpu->target_freq)
+				pcpu->target_freq = policy->max;
+			else if (policy->min > pcpu->target_freq)
+				pcpu->target_freq = policy->min;
+
+			/* Reschedule timer */
+			if (!timer_pending(&pcpu->cpu_timer)) {
+				exp = jiffies + usecs_to_jiffies(timer_rate);
+				pcpu->cpu_timer.expires = exp;
+				add_timer_on(&pcpu->cpu_timer, j);
+			}
+			if (timer_slack_val >= 0 &&
+			    !timer_pending(&pcpu->cpu_slack_timer)) {
+				exp += usecs_to_jiffies(timer_slack_val);
+				pcpu->cpu_slack_timer.expires = exp;
+				add_timer_on(&pcpu->cpu_slack_timer, j);
+			}
+			up_write(&pcpu->enable_sem);
+		}
+		mutex_unlock(&gov_lock);
 		break;
 	}
 	return 0;
