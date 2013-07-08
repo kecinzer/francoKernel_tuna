@@ -1102,20 +1102,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			pcpu->hispeed_validate_time =
 				pcpu->floor_validate_time;
 			down_write(&pcpu->enable_sem);
-<<<<<<< HEAD
-			expires = jiffies + usecs_to_jiffies(timer_rate);
-			pcpu->cpu_timer.expires = expires;
-			if (cpu_online(j)) {
-				add_timer_on(&pcpu->cpu_timer, j);
-				if (timer_slack_val >= 0) {
-					expires += usecs_to_jiffies(timer_slack_val);
-					pcpu->cpu_slack_timer.expires = expires;
-					add_timer_on(&pcpu->cpu_slack_timer, j);
-				}
-			}
-=======
 			cpufreq_interactive_timer_start(j);
->>>>>>> upstream/fk_4.2
 			pcpu->governor_enabled = 1;
 			up_write(&pcpu->enable_sem);
 		}
@@ -1176,11 +1163,6 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			__cpufreq_driver_target(policy,
 					policy->min, CPUFREQ_RELATION_L);
 		for_each_cpu(j, policy->cpus) {
-<<<<<<< HEAD
-			unsigned long uninitialized_var(exp);
-
-=======
->>>>>>> upstream/fk_4.2
 			pcpu = &per_cpu(cpuinfo, j);
 
 			/* hold write semaphore to avoid race */
@@ -1196,23 +1178,6 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			else if (policy->min > pcpu->target_freq)
 				pcpu->target_freq = policy->min;
 
-<<<<<<< HEAD
-			/* Reschedule timer */
-			if (!timer_pending(&pcpu->cpu_timer)) {
-				exp = jiffies + usecs_to_jiffies(timer_rate);
-				pcpu->cpu_timer.expires = exp;
-				add_timer_on(&pcpu->cpu_timer, j);
-			}
-			if (timer_slack_val >= 0 &&
-			    !timer_pending(&pcpu->cpu_slack_timer)) {
-				exp += usecs_to_jiffies(timer_slack_val);
-				pcpu->cpu_slack_timer.expires = exp;
-				add_timer_on(&pcpu->cpu_slack_timer, j);
-			}
-			up_write(&pcpu->enable_sem);
-		}
-		mutex_unlock(&gov_lock);
-=======
 			/* Reschedule timer.
 			 * Delete the timers, else the timer callback may
 			 * return without re-arm the timer when failed
@@ -1224,7 +1189,6 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			cpufreq_interactive_timer_start(j);
 			up_write(&pcpu->enable_sem);
 		}
->>>>>>> upstream/fk_4.2
 		break;
 	}
 	return 0;
