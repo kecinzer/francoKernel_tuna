@@ -346,13 +346,20 @@ CHECK		= sparse
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
-CFLAGS_MODULE   = -fno-pic
+CFLAGS_MODULE   = -O2 -mtune=cortex-a9 -march=armv7-a -mfpu=neon -ftree-vectorize
 AFLAGS_MODULE   =
 LDFLAGS_MODULE  =
-CFLAGS_KERNEL	= -mfpu=neon -ftree-vectorize
-AFLAGS_KERNEL	= -mfpu=neon -ftree-vectorize
+CFLAGS_KERNEL	= -O2 -mtune=cortex-a9 -march=armv7-a -mfpu=neon -ftree-vectorize -pipe
+AFLAGS_KERNEL	= -O2 -mtune=cortex-a9 -march=armv7-a -mfpu=neon -ftree-vectorize
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
+#
+# AK LINARO OPT
+#
+CFLAGS_A7       = -pipe -marm -mfloat-abi=softfp -mcpu=cortex-a9
+CFLAGS_GRAPHITE = -funswitch-loops -fpredictive-commoning -fgcse-after-reload \
+      -ftree-vectorize
+CFLAGS_MODULO   = -fmodulo-sched -fmodulo-sched-allow-regmoves
 
 # Use LINUXINCLUDE when you must reference the include/ directory.
 # Needed to be compatible with the O= option
@@ -363,20 +370,16 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
-CFLAGS_A9 = -march=armv7-a -mtune=cortex-a9 -mfpu=neon -funsafe-math-optimizations
-CFLAGS_MODULO = -fmodulo-sched -fmodulo-sched-allow-regmoves
-KERNEL_MODS = $(CFLAGS_A9) $(CFLAGS_MODULO)
-
 KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
-		   -fno-strict-aliasing -fno-common \
-		   -Werror-implicit-function-declaration \
-		   -Wno-format-security \
-		   -fno-delete-null-pointer-checks \
-       -ftree-vectorize \
+       -fno-strict-aliasing -fno-common \
+       -Werror-implicit-function-declaration \
+       -Wno-format-security \
+       -fno-delete-null-pointer-checks \
        -mno-unaligned-access \
-       $(KERNEL_MODS)
+       $(CFLAGS_A7) $(CFLAGS_GRAPHITE) $(CFLAGS_MODULO)
+
 KBUILD_AFLAGS_KERNEL :=
-KBUILD_CFLAGS_KERNEL :=
+KBUILD_CFLAGS_KERNEL := -O3 -mtune=cortex-a9 -march=armv7-a -mfpu=neon -ftree-vectorize
 KBUILD_AFLAGS   := -D__ASSEMBLY__
 KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE
@@ -567,9 +570,7 @@ all: vmlinux
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os
 else
-KBUILD_CFLAGS	+= -O3
-KBUILD_CFLAGS += $(call cc-disable-warning,maybe-uninitialized)
-KBUILD_CFLAGS += $(call cc-disable-warning,array-bounds)
+KBUILD_CFLAGS  += -O3
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
